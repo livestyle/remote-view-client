@@ -3,4 +3,7 @@
 
 var SocketCluster = require('./lib/socket-cluster');
 
-var cluster = new SocketCluster();
+var cluster = new SocketCluster({
+	url: 'http://localhost:9001',
+	maxConnections: 6
+});
