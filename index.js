@@ -1,9 +1,9 @@
-#!/usr/bin/env iojs --es-staging --harmony_arrow_functions
+#!/usr/bin/env iojs
 'use strict';
 
-var SocketCluster = require('./lib/socket-cluster');
+var TunnelCluster = require('./lib/tunnel-cluster');
 
-var cluster = new SocketCluster({
+var cluster = new TunnelCluster({
 	url: 'http://localhost:9001',
 	maxConnections: 6
 });
