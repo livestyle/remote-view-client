@@ -4,6 +4,7 @@ var net = require('net');
 var http = require('http');
 
 const CRLF = '\r\n';
+const HEADER_SEP = new Buffer(CRLF + CRLF);
 
 var tunnelServer, httpServer, sockets = [];
 var responder;
@@ -86,21 +87,19 @@ function request(socket, path, callback) {
 	var resp = new Buffer('');
 	socket
 	.on('data', function(chunk) {
-		console.log('received data');
-		console.log(chunk.toString());
-		console.log('--------------------');
 		resp = Buffer.concat([resp, chunk]);
 	})
 	.on('end', function() {
-		console.log('socket end');
+		var body = resp.slice(resp.indexOf(HEADER_SEP) + HEADER_SEP.length).toString();
 		var str = resp.toString();
 		resp = null;
-		callback(str);
+		callback(str, body);
 	})
 	.write([
 		`GET ${path} HTTP/1.1`,
 		`Host: localhost:9002`,
 		`Content-Type: text/plain`,
+		`Connection: close`,
 		CRLF
 	].join(CRLF));
 }

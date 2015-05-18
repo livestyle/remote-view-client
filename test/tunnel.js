@@ -16,9 +16,8 @@ describe('Tunnel', function() {
 
 	it('connect', function(done) {
 		var t = tunnel(9001, function() {
-			env.request('/foo', function(res) {
-				console.log('got response\n' + res);
-				assert.equal(res, '');
+			env.request('/foo', function(raw, body) {
+				assert.equal(body, 'Requested url: /foo');
 				done();
 			});
 		});
