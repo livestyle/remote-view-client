@@ -4,7 +4,7 @@
   "description": "LiveStyle Remote View sample client app",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "iojs ./node_modules/.bin/mocha --reporter spec"
   },
   "author": "Sergey Chikuyonok <serge.che@gmail.com>",
   "license": "MIT",
@@ -13,5 +13,8 @@
     "stream-combiner2": "^1.0.2",
     "through2": "^1.0.0",
     "xtend": "^4.0.0"
+  },
+  "devDependencies": {
+    "mocha": "^2.2.5"
   }
 }
