@@ -19,7 +19,6 @@ describe('Tunnel', function() {
 	var tunnelServer, httpServer, sockets = [];
 	before(env.start);
 	after(env.stop);
-	afterEach(env.resetResponder);
 
 	it('connect', function(done) {
 		var t = tunnel(9001, function() {
@@ -31,8 +30,8 @@ describe('Tunnel', function() {
 				assert(t.connected);
 				assert.equal(body, 'Requested url: http://localhost:9002/foo');
 				nextTick(function() {
-					// socket must be terminated
 					assert(hadActivity);
+					// socket must be terminated
 					assert(t.destroyed);
 					assert.equal(env.sockets.length, 0);
 					done();
@@ -44,8 +43,8 @@ describe('Tunnel', function() {
 	it('handle closed session', function(done) {
 		tunnel(9001, function() {
 			// instead of sending HTTP request to tunnel,
-			// send HTTP response instead, meaning that 
-			// server explicitly closed connection
+			// send HTTP response, which means server explicitly 
+			// closed connection (likely because of no session)
 			env.getSocket(function(socket) {
 				socket.write([
 					'HTTP/1.1 403 ' + http.STATUS_CODES['403'],
