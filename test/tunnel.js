@@ -12,7 +12,7 @@ function tunnel(url, callback) {
 function nextTick(fn) {
 	// do not use process.nextTick: we need to give Node more time
 	// to close connected sockets
-	setTimeout(fn, 1);
+	setTimeout(fn, 20);
 }
 
 describe('Tunnel', function() {
@@ -21,11 +21,8 @@ describe('Tunnel', function() {
 	after(env.stop);
 
 	it('connect', function(done) {
+		var hadActivity = false;
 		var t = tunnel(9001, function() {
-			var hadActivity = false;
-			t.on('activity', function() {
-				hadActivity = true;
-			});
 			env.request('/foo', function(raw, body) {
 				assert(t.connected);
 				assert.equal(body, 'Requested url: http://localhost:9002/foo');
@@ -37,6 +34,8 @@ describe('Tunnel', function() {
 					done();
 				});
 			});
+		}).on('activity', function() {
+			hadActivity = true;
 		});
 	});
 

@@ -137,7 +137,7 @@ describe('Cluster', function() {
 						self.destroy();
 						done();
 					});
-				}, 10);
+				}, 50);
 			}).on('reconnect', function() {
 				retries++;
 			});
