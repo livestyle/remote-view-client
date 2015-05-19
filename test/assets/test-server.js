@@ -32,7 +32,7 @@ module.exports.start = function(options, callback) {
 				return responder(req, res);
 			}
 
-			let out = 'Requested url: ' + req.url;
+			let out = `Requested url: http://${req.headers.host}${req.url}`;
 			res.writeHead(200, {
 				'Content-Length': out.length
 			});
@@ -54,31 +54,29 @@ module.exports.resetResponder = function() {
 	responder = null;
 };
 
+module.exports.getSocket = function getSocket(callback) {
+	var retries = 15;
+	function next() {
+		if (sockets.length) {
+			return callback(sockets[0]);
+		}
+
+		if (--retries <= 0) {
+			throw new Error('No available socket');
+		}
+		setTimeout(next, 10);
+	}
+	next();
+};
+
 /**
  * Sends HTTP request via plain TCP tunnel socket
  * @param  {String} path 
  */
 module.exports.request = function(path, callback) {
-	setTimeout(function() {
-		if (sockets.length) {
-			return request(sockets[0], path, callback);
-		}
-
-		// connected sockets are not immediately available,
-		// wait a bit until first free socket become available
-		// before throwing error 
-		var retries = 15;
-		process.nextTick(function next() {
-			if (sockets.length) {
-				return request(sockets[0], path, callback);
-			}
-
-			if (--retries <= 0) {
-				throw new Error('No available socket');
-			}
-			process.nextTick(next);
-		});
-	}, 10);
+	module.exports.getSocket(function(socket) {
+		request(sockets[0], path, callback);
+	});
 };
 
 module.exports.sockets = sockets;
