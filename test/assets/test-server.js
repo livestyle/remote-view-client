@@ -22,7 +22,7 @@ module.exports.start = function(options, callback) {
 			if (ix !== -1) {
 				sockets.splice(ix, 1);
 			} else {
-				console.error('Socket is not in pool');
+				console.warn('Socket is not in pool');
 			}
 		});
 	}).listen(9001, function() {
@@ -42,6 +42,11 @@ module.exports.start = function(options, callback) {
 };
 
 module.exports.stop = function() {
+	var s;
+	while(s = module.exports.sockets.pop()) {
+		s.destroy();
+	}
+
 	tunnelServer.close();
 	httpServer.close();
 };
