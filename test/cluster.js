@@ -1,7 +1,7 @@
 var http = require('http');
 var assert = require('assert');
 var extend = require('xtend');
-var TunnelCluster = require('../lib/tunnel-cluster');
+var TunnelCluster = require('../').TunnelCluster;
 var env = require('./assets/test-server');
 
 function cluster(options, callback) {
@@ -10,7 +10,11 @@ function cluster(options, callback) {
 		options = {};
 	}
 
-	return new TunnelCluster(extend({url: 9001}, options || {}), callback);
+	if (typeof options === 'string') {
+		options = {url: options};
+	}
+
+	return new TunnelCluster(options, callback);
 }
 
 describe('Cluster', function() {
@@ -18,7 +22,7 @@ describe('Cluster', function() {
 	after(env.stop);
 
 	it('connect', function(done) {
-		cluster(function() {
+		cluster('http://localhost:9001/sess-test', function() {
 			assert(this.tunnels.length, 1);
 			assert.equal(this.state, 'idle');
 			this.destroy();
@@ -31,28 +35,34 @@ describe('Cluster', function() {
 		// receives data, then close all tunnels except one after
 		// `idleTimeout` period of inactivity
 		var options = {
+			url: 'http://localhost:9001/sess-test',
 			maxConnections: 4, 
 			idleTimeout: 200
 		};
 		var becameActive = 0, becameIdle = 0;
 
 		var c = cluster(options, function() {
-			env.request('/foo', function(raw, body) {
-				assert.equal(body, 'Requested url: http://localhost:9002/foo');
-				assert.equal(c.tunnels.length, options.maxConnections);
-				assert.equal(becameIdle, 0);
-				assert.equal(becameActive, 1);
-
-				// wait for until cluster become idle
-				setTimeout(function() {
-					assert.equal(becameIdle, 1);
+			http.request('http://localhost:9001/foo', function(res) {
+				var body = '';
+				res.on('data', function(chunk) {
+					body += chunk.toString();
+				}).on('end', function() {
+					assert.equal(body, 'Requested URL: http://localhost:9999/foo');
+					assert.equal(c.tunnels.length, options.maxConnections);
+					assert.equal(becameIdle, 0);
 					assert.equal(becameActive, 1);
-					assert.equal(c.tunnels.length, 1);
 
-					c.destroy();
-					done();
-				}, options.idleTimeout + 10);
-			});
+					// wait for until cluster become idle
+					setTimeout(function() {
+						assert.equal(becameIdle, 1);
+						assert.equal(becameActive, 1);
+						assert.equal(c.tunnels.length, 1);
+
+						c.destroy();
+						done();
+					}, options.idleTimeout + 10);
+				});
+			}).end();
 		}).on('state', function(value) {
 			if (value === 'idle') {
 				becameIdle++;
@@ -65,7 +75,7 @@ describe('Cluster', function() {
 	it('destroy', function(done) {
 		// destroying scenario: remove all tunnels and do not 
 		// allow any further tunnels creation
-		cluster(function() {
+		cluster('http://localhost:9001/sess-test', function() {
 			this.destroy();
 			assert.equal(this.tunnels.length, 0);
 
@@ -80,20 +90,10 @@ describe('Cluster', function() {
 
 	it('no session', function(done) {
 		// destroy cluster if one of the tunnels returned
-		// ESERVERDISCONNECT error
-		cluster(function() {
-			// instead of sending HTTP request to tunnel,
-			// send HTTP response, which means server explicitly 
-			// closed connection (likely because of no session)
-			env.getSocket(function(socket) {
-				socket.write([
-					'HTTP/1.1 403 ' + http.STATUS_CODES['403'],
-					'Connection: close',
-					'\r\n'
-				].join('\r\n'));
-			});
-		}).on('error', function(err) {
-			assert.equal(err.code, 'ESERVERDISCONNECT');
+		// EFORBIDDEN error
+		cluster('http://localhost:9001/no-session')
+		.on('error', function(err) {
+			assert.equal(err.code, 'EFORBIDDEN');
 			assert.equal(this.state, 'destroyed');
 			assert.equal(this.tunnels.length, 0);
 			done();
@@ -102,21 +102,23 @@ describe('Cluster', function() {
 
 	describe('Re-connect', function() {
 		var options = {
+			url: 'http://localhost:9001/sess-test',
 			retryCount: 5,
 			retryDelay: 100
 		};
 
 		it('no initial connection', function(done) {
-			env.stop();
-			setTimeout(env.start, 320);
-			var retries = 0;
-			cluster(options, function() {
-				assert.equal(this.tunnels.length, 1);
-				assert(retries > 2);
-				this.destroy();
-				done();
-			}).on('reconnect', function() {
-				retries++;
+			env.stop(function() {
+				setTimeout(env.start, 320);
+				var retries = 0;
+				cluster(options, function() {
+					assert.equal(this.tunnels.length, 1);
+					assert(retries > 2);
+					this.destroy();
+					done();
+				}).on('reconnect', function() {
+					retries++;
+				});
 			});
 		});
 
@@ -126,18 +128,19 @@ describe('Cluster', function() {
 			cluster(options, function() {
 				var self = this;
 				assert.equal(self.tunnels.length, 1);
-				env.stop();
-				setTimeout(function() {
-					// make sure there’s no active tunnels
-					assert.equal(self.tunnels.length, 0);
-					setTimeout(env.start, 320);
-					self.once('connect', function() {
-						assert.equal(self.tunnels.length, 1);
-						assert(retries > 2);
-						self.destroy();
-						done();
-					});
-				}, 50);
+				env.stop(function() {
+					setTimeout(function() {
+						// make sure there’s no active tunnels
+						assert.equal(self.tunnels.length, 0);
+						setTimeout(env.start, 320);
+						self.once('connect', function() {
+							assert.equal(self.tunnels.length, 1);
+							assert(retries > 2);
+							self.destroy();
+							done();
+						});
+					}, 50);
+				});
 			}).on('reconnect', function() {
 				retries++;
 			});
@@ -145,18 +148,20 @@ describe('Cluster', function() {
 
 		it('fail to connect', function(done) {
 			// server did not become active or reachable, throw error
-			env.stop();
-			var retries = 0;
-			cluster(options, function() {
-				throw new Error('Should not connect');
-			}).on('reconnect', function() {
-				retries++;
-			}).on('error', function(err) {
-				assert.equal(err.code, 'ESERVERUNREACHABLE');
-				assert.equal(this.tunnels.length, 0);
-				assert.equal(retries, 5);
-				assert.equal(this.state, 'destroyed');
-				done();
+			env.stop(function() {
+				var retries = 0;
+				cluster(options, function() {
+					throw new Error('Should not connect');
+				}).on('reconnect', function() {
+					retries++;
+				}).on('error', function(err) {
+					assert.equal(err.code, 'ESERVERUNREACHABLE');
+					assert.equal(this.tunnels.length, 0);
+					assert.equal(retries, 5);
+					assert.equal(this.state, 'destroyed');
+					// restore connection for other tests
+					env.start(done);
+				});
 			});
 		});
 	});

@@ -1,13 +1,16 @@
 'use strict';
 
-var net = require('net');
 var http = require('http');
+var parseUrl = require('url').parse;
+var extend = require('xtend');
 
-const CRLF = '\r\n';
-const HEADER_SEP = new Buffer(CRLF + CRLF);
+var stubServer, rvServer;
+var tunnels = [];
 
-var tunnelServer, httpServer, sockets = [];
-var responder;
+var defaultOptions = {
+	port: 9001,
+	remoteUrl: 'http://localhost:9999'
+};
 
 module.exports.start = function(options, callback) {
 	if (typeof options === 'function') {
@@ -15,94 +18,78 @@ module.exports.start = function(options, callback) {
 		options = {};
 	}
 
-	tunnelServer = net.createServer(function(socket) {
-		sockets.push(socket);
-		socket.on('close', function() {
-			var ix = sockets.indexOf(socket);
-			if (ix !== -1) {
-				sockets.splice(ix, 1);
-			} else {
-				console.warn('Socket is not in pool');
-			}
-		});
-	}).listen(9001, function() {
-		httpServer = http.createServer(function(req, res) {
-			// we have to explicitly call respond() method
-			if (typeof responder === 'function') {
-				return responder(req, res);
-			}
+	options = extend(defaultOptions, options || {});
 
-			let out = `Requested url: http://${req.headers.host}${req.url}`;
-			res.writeHead(200, {
-				'Content-Length': out.length
-			});
-			res.end(out);
-		}).listen(9002, callback);
+	// stub HTTP server
+	stubServer = http.createServer(function(req, res) {
+		var msg = `Requested URL: http://${req.headers['host']}${req.url}`;
+		var headers = Object.keys(req.headers).reduce(function(prev, header) {
+			if (/^x\-/i.test(header)) {
+				prev[header] = req.headers[header];
+			}
+		}, {'content-length': msg.length});
+		res.writeHead(200, headers);
+		res.end(msg);
+	});
+
+	// Remote View proxy server
+	rvServer = http.createServer(function(req, res) {
+		if (tunnels.length) {
+			redirect(tunnels[0], options.remoteUrl, req, res);
+		} else {
+			res.writeHead(500);
+			res.end('No available tunnel');
+		}
+	})
+	.on('connect', function(req, socket, head) {
+		if (req.url === '/no-session') {
+			// a special case for testing non-existing sessions
+			socket.end('HTTP/1.1 412 No Session\r\n\r\n');
+			return socket.destroy();
+		}
+
+		socket
+		.once('data', function() {
+			tunnels.push(socket);
+			rvServer.emit('tunnel', socket);
+		})
+		.once('end', function() {
+			var ix = tunnels.indexOf(this);
+			~ix && tunnels.splice(ix, 1);
+			socket.destroy();
+		})
+		.write(
+			'HTTP/1.1 200 Connection Established\r\n' +
+			`X-RV-Host: ${options.remoteUrl}\r\n` +
+			'\r\n'
+		);
+	});
+
+	rvServer.listen(options.port, function() {
+		stubServer.listen(parseUrl(options.remoteUrl).port, callback);
+	});
+	return rvServer;
+};
+
+module.exports.stop = function(callback) {
+	stubServer.close(function() {
+		rvServer.close(callback);
 	});
 };
 
-module.exports.stop = function() {
-	var s;
-	while(s = module.exports.sockets.pop()) {
-		s.destroy();
-	}
+module.exports.tunnels = tunnels;
 
-	tunnelServer.close();
-	httpServer.close();
-};
-
-module.exports.setResponder = function(fn) {
-	responder = fn;
-};
-
-module.exports.resetResponder = function() {
-	responder = null;
-};
-
-module.exports.getSocket = function getSocket(callback) {
-	var retries = 15;
-	function next() {
-		if (sockets.length) {
-			return callback(sockets[0]);
-		}
-
-		if (--retries <= 0) {
-			throw new Error('No available socket');
-		}
-		setTimeout(next, 10);
-	}
-	next();
-};
-
-/**
- * Sends HTTP request via plain TCP tunnel socket
- * @param  {String} path 
- */
-module.exports.request = function(path, callback) {
-	module.exports.getSocket(function(socket) {
-		request(sockets[0], path, callback);
+function redirect(socket, url, req, res) {
+	var headers = extend(req.headers, {
+		host: parseUrl(url).host
 	});
-};
 
-module.exports.sockets = sockets;
+	var payload = [`${req.method} ${req.url} HTTP/1.1`];
+	Object.keys(headers).forEach(function(header) {
+		payload.push(`${header}: ${headers[header]}`);
+	});
+	payload.push('\r\n');
 
-function request(socket, path, callback) {
-	var resp = new Buffer('');
-	socket
-	.on('data', function(chunk) {
-		resp = Buffer.concat([resp, chunk]);
-	})
-	.on('end', function() {
-		var body = resp.slice(resp.indexOf(HEADER_SEP) + HEADER_SEP.length).toString();
-		var str = resp.toString();
-		resp = null;
-		callback(str, body);
-	})
-	.write([
-		`GET ${path} HTTP/1.1`,
-		`Host: localhost:9002`,
-		`Content-Type: text/plain`,
-		`Connection: close`,
-		CRLF
-	].join(CRLF));
+	socket.write(payload.join('\r\n'));
+	req.pipe(socket, {end: false}).pipe(res.connection);
 }

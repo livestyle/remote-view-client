@@ -2,58 +2,48 @@
 
 var http = require('http');
 var assert = require('assert');
-var Tunnel = require('../lib/tunnel');
+var Tunnel = require('../').Tunnel;
 var env = require('./assets/test-server');
 
 function tunnel(url, callback) {
 	return new Tunnel(url, callback);
 }
 
-function nextTick(fn) {
-	// do not use process.nextTick: we need to give Node more time
-	// to close connected sockets
-	setTimeout(fn, 20);
-}
-
 describe('Tunnel', function() {
-	var tunnelServer, httpServer, sockets = [];
 	before(env.start);
 	after(env.stop);
 
 	it('connect', function(done) {
 		var hadActivity = false;
-		var t = tunnel(9001, function() {
-			env.request('/foo', function(raw, body) {
-				assert(t.connected);
-				assert.equal(body, 'Requested url: http://localhost:9002/foo');
-				nextTick(function() {
+		var t = tunnel('http://localhost:9001/sess-test', function() {
+			assert(t.connected);
+			http.request('http://localhost:9001/foo', function(res) {
+				var body = '';
+				res.on('data', function(chunk) {
+					body += chunk.toString();
+				}).on('end', function() {
+					assert.equal(body, 'Requested URL: http://localhost:9999/foo');
 					assert(hadActivity);
-					// socket must be terminated
-					assert(t.destroyed);
-					assert.equal(env.sockets.length, 0);
-					done();
+					setImmediate(function() {
+						// socket must be terminated
+						assert(t.destroyed);
+						assert.equal(env.tunnels.length, 0);
+						done();
+					});
 				});
-			});
+			}).end();
 		}).on('activity', function() {
 			hadActivity = true;
 		});
 	});
 
 	it('handle closed session', function(done) {
-		tunnel(9001, function() {
-			// instead of sending HTTP request to tunnel,
-			// send HTTP response, which means server explicitly 
-			// closed connection (likely because of no session)
-			env.getSocket(function(socket) {
-				socket.write([
-					'HTTP/1.1 403 ' + http.STATUS_CODES['403'],
-					'Connection: close',
-					'\r\n'
-				].join('\r\n'));
-			});
+		tunnel('http://localhost:9001/no-session', function() {
+			throw new Error('Should not connect');
 		}).on('destroy', function(err) {
-			assert.equal(err.code, 'ESERVERDISCONNECT');
-			assert.equal(err.statusCode, 403);
+			assert.equal(err.code, 'EFORBIDDEN');
+			assert.equal(err.statusCode, 412);
+			assert.equal(env.tunnels.length, 0);
 			done();
 		});
 	});
