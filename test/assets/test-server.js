@@ -48,9 +48,9 @@ module.exports.start = function(options, callback) {
 			return socket.destroy();
 		}
 
+		tunnels.push(socket);
 		socket
 		.once('data', function() {
-			tunnels.push(socket);
 			rvServer.emit('tunnel', socket);
 		})
 		.once('end', function() {
@@ -72,6 +72,12 @@ module.exports.start = function(options, callback) {
 };
 
 module.exports.stop = function(callback) {
+	// explicitly destroy tunnels, required for Linux
+	// to properly shut down server
+	while (tunnels.length) {
+		tunnels.pop().destroy();
+	}
+	
 	stubServer.close(function() {
 		rvServer.close(callback);
 	});
