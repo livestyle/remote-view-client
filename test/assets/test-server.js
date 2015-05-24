@@ -1,5 +1,7 @@
 'use strict';
 
+var fs = require('fs');
+var path = require('path');
 var http = require('http');
 var parseUrl = require('url').parse;
 var extend = require('xtend');
@@ -12,6 +14,12 @@ var defaultOptions = {
 	remoteUrl: 'http://localhost:9999'
 };
 
+var mimeTypes = {
+	css: 'text/css', 
+	html: 'text/html',
+	js: 'text/javascript'
+};
+
 module.exports.start = function(options, callback) {
 	if (typeof options === 'function') {
 		callback = options;
@@ -22,6 +30,19 @@ module.exports.start = function(options, callback) {
 
 	// stub HTTP server
 	stubServer = http.createServer(function(req, res) {
+		var fileName = __dirname + req.url;
+		try {
+			// try to return a file
+			if (fs.statSync(fileName)) {
+				var ext = path.extname(fileName).slice(1);
+				res.writeHead(200, {
+					'content-type': mimeTypes[ext] || 'text/plain'
+				});
+				return fs.createReadStream(fileName).pipe(res);
+			}
+		} catch(e) {}
+
+		// return a stub response
 		var msg = `Requested URL: http://${req.headers['host']}${req.url}`;
 		var headers = Object.keys(req.headers).reduce(function(prev, header) {
 			if (/^x\-/i.test(header)) {

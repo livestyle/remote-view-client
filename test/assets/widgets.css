@@ -1,0 +1,339 @@
+.ls-highlight {
+	font-weight: bold;
+	color: #fc0;
+}
+
+.ls-widget {
+	font-family: 'DejaVu Sans Mono', Consolas, Menlo, monospace;
+	font-size: 11px;
+	background: #f0f0f0;
+	box-shadow: inset 1px 1px 2px rgba(0,0,0,0.13);
+	border-radius: 3px;
+	padding: 2px 7px;
+	color: #a8a8a8;
+	line-height: 1.4;
+	z-index: 2;
+	margin-left: 8px;
+}
+
+.ls-widget__tail {
+	display: inline-block;
+	overflow: hidden;
+	width: 6px;
+	height: 8px;
+	position: absolute;
+	top: 6px;
+	left: -4px;
+	background-color: inherit;
+	visibility: hidden;
+}
+
+.ls-widget__tail:before {
+	content: '';
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	position: absolute;
+	top: 50%;
+	background-color: inherit;
+	visibility: visible;
+	box-shadow: inset 0 2px 2px rgba(0,0,0,0.13);
+	
+	-webkit-transform-origin: 0 0;
+	-moz-transform-origin: 0 0;
+	-ms-transform-origin: 0 0;
+	-o-transform-origin: 0 0;
+	transform-origin: 0 0;
+	-webkit-transform: rotate(-45deg);
+	-o-transform: rotate(-45deg);
+	transform: rotate(-45deg);
+}
+
+
+.ls-widget__label {
+	max-width: 150px;
+	-ms-text-overflow: ellipsis;
+	margin-top: 0.3em;
+	margin-left: 8px;
+}
+
+.ls-mixin-call__name {
+	margin-top: 15px;
+	font-weight: bold;
+	padding-bottom: 2px;
+}
+
+.ls-mixin-call__name:first-child {
+	margin-top: 0;
+}
+
+.ls-mixin-call__property-name:after {
+	content: ': ';
+}
+
+.ls-mixin-call__property-value:after {
+	content: ';';
+}
+
+.ls-mixin-call__section-name:after {
+	content: ' {';
+}
+
+.ls-mixin-call__section-body {
+	padding-left: 10px;
+}
+
+.ls-mixin-call__section-body:after {
+	content: '}';
+	margin-left: -10px;
+}
+
+.ls-widget__variable-suggest {
+	margin-left: 7px;
+	margin-top: 3px;
+	z-index: 5;
+	background: #ffa510;
+}
+
+.ls-widget__variable-suggest {
+	background: #f3a43d;
+	color: #fff;
+}
+
+.ls-widget__variable-suggest:not([data-active]) {
+	border-radius: 50%;
+	width: 15px;
+	height: 15px;
+	line-height: 15px;
+	padding: 0;
+	text-align: center;
+	margin-left: 2px;
+	margin-top: 3px;
+	
+	cursor: pointer;
+}
+
+.ls-widget__variable-suggest:not([data-active])::after {
+	content: '+';
+}
+
+.ls-widget__variable-suggest:not([data-active]) > .ls-widget__tail,
+.ls-widget__variable-suggest:not([data-active]) > .ls-widget__content {
+	display: none;
+}
+
+.ls-widget__variable-suggest[data-active] {
+	z-index: 6;
+}
+
+.ls-suggestion {
+	white-space: nowrap;
+	padding: 3px 7px;
+	margin: 0 -7px;
+	position: relative;
+	z-index: 2;
+	cursor: pointer;
+}
+
+.ls-suggestion:hover {
+	background: rgba(255, 255, 255, 0.25);
+}
+
+.ls-suggestion__name {
+	font-weight: bold;
+	text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+}
+
+.ls-suggestion__value {
+	opacity: 0.6;
+}
+
+.ls-widget__color {
+	display: inline-block;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	border-radius: 2px;
+	margin-right: 2px;
+	width: 15px;
+	height: 1em;
+	line-height: 1;
+	text-align: center;
+	box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.15);
+	position: relative;
+}
+
+.ls-widget__color:not([data-exact])::before {
+	content: '≈';
+	opacity: .5;
+}
+
+.ls-widget__computed-value {
+	background: #2e97e3;
+	color: #fff;
+}
+
+.ls-widget__computed-value .ls-widget__color {
+	top: 2px;
+}
+
+.ls-widget__mixin-call {
+	background: #2ECC71;
+	color: #fff;
+}
+
+.ls-mixin-call {
+	margin-top: 7px;
+	border-top: 1px solid rgba(255, 255, 255, 0.4);
+	padding-top: 7px;
+}
+
+.ls-mixin-call:first-child {
+	margin-top: 0;
+	padding: 0;
+	border: 0;
+}
+
+.ls-mixin-call__body {
+	font-size: 0.9em;
+	color: #b9ecc7;
+}
+
+/* Outline */
+
+.ls-widget__outline {
+	font-size: 11px;
+	position: absolute;
+	top: 100px;
+	left: 50%;
+	z-index: 5;
+	width: 300px;
+	margin-left: -150px;
+	padding: 0 15px;
+	color: #9ea2a4;
+	background: #3d4652;
+	border-right: 2px;
+	-moz-box-sizing: border-box;
+	box-sizing: border-box;
+}
+
+.ls-widget__outline .ls-widget__tail {
+	display: none;
+}
+
+.ls-outline__search {
+	display: block;
+	/* padding: 7px; */
+	width: 270px;
+	background-color: transparent;
+	color: #b3b3b3;
+	outline: none;
+	font-size: 1.3em;
+	border: 0;
+	border-bottom: 1px solid #505862;
+	padding: 8px 120px 8px 0;
+
+	-moz-box-sizing: border-box;
+	box-sizing: border-box;
+
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	margin-right: -200px;
+}
+
+.ls-outline__switch {
+	display: block;
+	list-style-type: none;
+	padding: 0;
+	margin: 0;
+	position: absolute;
+	top: 6px;
+	right: 15px;
+	line-height: 1;
+	text-align: center;
+	font-family: 'Helvetica Neue', Arial, sans-serif;
+	font-size: 11px;
+	color: #fff;
+	background: #232b39;
+	border-radius: 15px;
+}
+
+.ls-outline__switch-label {
+	display: inline-block;
+	padding: 5px 8px;
+	cursor: pointer;
+}
+
+.ls-outline__switch-label_active {
+	background: #0396df;
+	border-radius: inherit;
+}
+
+.ls-outline__sections {
+	max-height: 300px;
+	overflow: auto;
+	margin: 0 -15px;
+	position: relative;
+}
+
+.ls-outline__section {
+	display: none;
+	padding: 7px 0;
+	overflow: hidden;
+}
+
+.ls-outline__section_active {
+	display: block;
+}
+
+.ls-outline__node-label {
+	display: block;
+	position: relative;
+	padding-left: 15px;
+	line-height: 1.5;
+	cursor: pointer;
+}
+
+.ls-outline__node_selected > .ls-outline__node-label::before,
+.ls-outline__node-label:hover::before {
+	display: inline-block;
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -50%;
+	width: 200%;
+	background: rgba(255, 255, 255, 0.2);
+}
+
+.ls-outline__node:not([data-type="property"]) > .ls-outline__node-label {
+	font-weight: bold;
+	color: #fff;
+	text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.ls-outline__node-body {
+	padding-left: 20px;
+}
+
+.ls-outline__section_filtered .ls-outline__node:not(.ls-outline__node_filtered) {
+	display: none;
+}
+
+.ls-outline__tip {
+	background: #313842;
+	box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.3);
+	margin: 0 -15px;
+	padding: 4px 15px;
+	font-family: 'Helvetica Neue', Arial, sans-serif;
+	text-align: center;
+	font-size: 11px;
+	color: #5e646b;
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
+}
+
+.CodeMirror-hint {
+	font-family: 'DejaVu Sans Mono', Consolas, Menlo, monospace;
+	padding: 4px;
+	font-size: 11px;
+}
