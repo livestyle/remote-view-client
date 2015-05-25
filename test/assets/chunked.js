@@ -1,17 +1,54 @@
 'use strict';
 
 var fs = require('fs');
+var net = require('net');
 var http = require('http');
 var zlib = require('zlib');
+var through = require('through2');
+var gzip = require('../../lib/gzip');
 
-var server = http.createServer(function(req, res) {
-	res.writeHead(200, {'Content-Encoding': 'gzip'});
-	fs.createReadStream(__dirname + req.url)
-	.pipe(zlib.createGzip())
-	.on('data', function(chunk) {
-		console.log('Writing chunk', chunk.length);
-	})
-	.pipe(res);
+var server = net.createServer(function(socket) {
+	socket.on('data', function(chunk) {
+		console.log('received request', chunk.length);
+		var headerDumped = false;
+		fs.createReadStream(__dirname + '/widgets.css')
+		.pipe(zlib.createGzip())
+		.pipe(through(function(chunk, enc, next) {
+			if (!headerDumped) {
+				console.log('dumping header');
+				this.push([
+					'HTTP/1.1 200 OK',
+					'content-type: text/css',
+					'Date: Mon, 25 May 2015 08:35:04 GMT',
+					'Connection: close',
+					'Transfer-Encoding: chunked',
+					'Content-Encoding: gzip',
+					'\r\n'
+				].join('\r\n'));
+				headerDumped = true;
+			}
+			console.log('writing chunk', chunk.length);
+			this.push(chunk.length.toString(16) + '\r\n');
+			this.push(chunk);
+			this.push('\r\n');
+			next();
+		}, function(next) {
+			console.log('finishing stream');
+			this.push('0\r\n\r\n');
+			next();
+		}))
+		.pipe(socket);
+	});
+
+
+
+	// res.writeHead(200, {'Content-Encoding': 'gzip'});
+	// fs.createReadStream(__dirname + req.url)
+	// .pipe(zlib.createGzip())
+	// .on('data', function(chunk) {
+	// 	console.log('Writing chunk', chunk.length);
+	// })
+	// .pipe(res);
 });
 
 server.listen(9002, function() {

@@ -15,6 +15,7 @@ describe('Tunnel', function() {
 
 	it('connect', function(done) {
 		var hadActivity = false;
+		var responseReceived = false;
 		var t = tunnel('http://localhost:9001/sess-test', function() {
 			assert(t.connected);
 			http.request('http://localhost:9001/foo', function(res) {
@@ -22,18 +23,21 @@ describe('Tunnel', function() {
 				res.on('data', function(chunk) {
 					body += chunk.toString();
 				}).on('end', function() {
+					responseReceived = true;
 					assert.equal(body, 'Requested URL: http://localhost:9999/foo');
 					assert(hadActivity);
-					setImmediate(function() {
-						// socket must be terminated
-						assert(t.destroyed);
-						assert.equal(env.tunnels.length, 0);
-						done();
-					});
 				});
 			}).end();
-		}).on('activity', function() {
+		})
+		.on('activity', function() {
 			hadActivity = true;
+		})
+		.on('destroy', function() {
+			// tunnel must be terminated
+			assert(responseReceived);
+			assert(t.destroyed);
+			assert.equal(env.tunnels.length, 0);
+			done();
 		});
 	});
 

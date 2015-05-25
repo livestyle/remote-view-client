@@ -1,58 +1,46 @@
 'use strict';
 
+var fs = require('fs');
+var path = require('path');
 var http = require('http');
 var assert = require('assert');
 var request = require('request');
-var parseUrl = require('url').parse;
 var Tunnel = require('../').Tunnel;
 var env = require('./assets/test-server');
 
-describe.skip('Gzip content', function() {
-	before(env.start);
-	after(env.stop);
+describe('Gzip content', function() {
+	var originalFile;
+	before(function(done) {
+		originalFile = fs.readFileSync(path.join(__dirname, 'assets', 'codemirror.js'), 'utf8');
+		env.start(done);
+	});
 
-	it('compress on-the-fly', function(done) {
-		var start = Date.now();
+	after(function(done) {
+		originalFile = null;
+		env.stop(done);
+	});
+
+	it('compress', function(done) {
 		new Tunnel('http://localhost:9001/sess-test', function() {
-			var end = Date.now();
+			// send request and tell we support compression
+			request('http://localhost:9001/codemirror.js', {gzip: true}, function(err, res, body) {
+				assert.equal(res.headers['content-encoding'], 'gzip');
+				assert.equal(res.headers['transfer-encoding'], 'chunked');
+				assert.equal(body, originalFile);
+				done();
+			});
+		});
+	});
 
-			var opt = parseUrl('http://localhost:9001/widgets.css');
-			opt.headers = {
-				'Accept-Encoding': 'gzip'
-			};
-
-			http.request(opt, function(res) {
-				var data;
-				res.on('data', function(chunk) {
-					data = data ? Buffer.concat([data, chunk]) : chunk;
-				}).on('end', function() {
-					console.log('total response size', data.length);
-					setTimeout(done, 500);
-				});
-			})
-			.on('socket', function(socket) {
-				var sep = new Buffer('\r\n\r\n');
-				socket.on('data', function(chunk) {
-					console.log('socket chunk', chunk.length);
-					var ix = chunk.indexOf(sep);
-					if (ix !== -1) {
-						console.log(chunk.slice(0, ix).toString());
-						console.log(chunk.slice(ix + sep.length, ix + sep.length + 20));
-					}
-				});
-			})
-			.end();
-
-			// request('http://localhost:9001/codemirror.js', opt, function(err, res, body) {
-			// 	console.log('tunnel handshake: %dms', end - start);
-			// 	if (err) {
-			// 		console.error(err);
-			// 	} else {
-			// 		console.log(res.headers);
-			// 		console.log(body.length);
-			// 	}
-			// 	done();
-			// });
+	it('do not compress', function(done) {
+		new Tunnel('http://localhost:9001/sess-test', function() {
+			// send request and DO NOT tell we support compression
+			request('http://localhost:9001/codemirror.js', function(err, res, body) {
+				assert.equal(res.headers['content-encoding'], undefined);
+				assert.equal(res.headers['transfer-encoding'], 'chunked');
+				assert.equal(body, originalFile);
+				done();
+			});
 		});
 	});
 });
