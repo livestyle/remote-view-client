@@ -11,8 +11,9 @@ module.exports.Tunnel = Tunnel;
 module.exports.TunnelCluster = TunnelCluster;
 
 if (require.main === module) {
+	var sessionId = process.argv[2] || '';
 	var cluster = new TunnelCluster({
-		url: 'http://localhost:9001',
-		maxConnections: 6
+		url: `http://localhost:9001/${sessionId}`,
+		maxConnections: 10
 	});
 }
