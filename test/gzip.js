@@ -26,6 +26,7 @@ describe('Gzip content', function() {
 			request('http://localhost:9001/codemirror.js', {gzip: true}, function(err, res, body) {
 				assert.equal(res.headers['content-encoding'], 'gzip');
 				assert.equal(res.headers['transfer-encoding'], 'chunked');
+				assert.equal(body.length, originalFile.length);
 				assert.equal(body, originalFile);
 				done();
 			});
@@ -38,6 +39,7 @@ describe('Gzip content', function() {
 			request('http://localhost:9001/codemirror.js', function(err, res, body) {
 				assert.equal(res.headers['content-encoding'], undefined);
 				assert.equal(res.headers['transfer-encoding'], 'chunked');
+				assert.equal(body.length, originalFile.length);
 				assert.equal(body, originalFile);
 				done();
 			});
