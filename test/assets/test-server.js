@@ -70,10 +70,8 @@ module.exports.start = function(options, callback) {
 		}
 
 		tunnels.push(socket);
+		rvServer.emit('tunnel', socket);
 		socket
-		.once('data', function() {
-			rvServer.emit('tunnel', socket);
-		})
 		.once('end', function() {
 			var ix = tunnels.indexOf(this);
 			~ix && tunnels.splice(ix, 1);
