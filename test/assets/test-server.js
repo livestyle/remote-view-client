@@ -82,6 +82,24 @@ module.exports.start = function(options, callback) {
 			`X-RV-Host: ${options.remoteUrl}\r\n` +
 			'\r\n'
 		);
+	})
+	.on('upgrade', function(req, socket, head) {
+		console.log('got upgrade');
+		if (tunnels.length) {
+			var payload = `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`;
+			for (var i = 0, il = req.rawHeaders.length; i < il; i+=2) {
+				payload += `${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}\r\n`;
+			}
+
+			payload += '\r\n';
+			console.log(payload);
+			tunnels[0].write(payload);
+
+			socket.pipe(tunnels[0]).pipe(socket);
+		} else {
+			res.writeHead(500);
+			res.end('No available tunnel');
+		}
 	});
 
 	rvServer.listen(options.port, function() {
