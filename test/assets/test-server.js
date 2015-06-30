@@ -8,10 +8,12 @@ var extend = require('xtend');
 
 var stubServer, rvServer;
 var tunnels = [];
+var livestyleConnection = null;
 
 var defaultOptions = {
 	port: 9001,
-	remoteUrl: 'http://localhost:9999'
+	remoteUrl: 'http://localhost:9999',
+	livestyleUrl: 'http://localhost:54009'
 };
 
 var mimeTypes = {
@@ -69,19 +71,31 @@ module.exports.start = function(options, callback) {
 			return socket.destroy();
 		}
 
-		tunnels.push(socket);
-		rvServer.emit('tunnel', socket);
-		socket
-		.once('end', function() {
-			var ix = tunnels.indexOf(this);
-			~ix && tunnels.splice(ix, 1);
+		if (req.headers['x-rv-connection'] === 'livestyle') {
+			// a LiveStyle dedicated connector, keep it separately
+			connectLivestyle(socket, options);
+		} else {
+			connectTunnel(socket, options);
+		}
+	})
+	.on('upgrade', function(req, socket) {
+		if (/^\/__livestyle__\b/.test(req.url)) {
+			// requested connection to LiveStyle tunnel
+			if (livestyleConnection) {
+				redirectWS(livestyleConnection, options.livestyleUrl, req);
+			} else {
+				socket.end(`HTTP/1.1 404 No Connected LiveStyle Client\r\n\r\n`);
+				socket.destroy();
+			}
+			return;
+		}
+
+		if (tunnels.length) {
+			redirectWS(tunnels[0], options.remoteUrl, req);
+		} else {
+			socket.end(`HTTP/1.1 404 No Tunnel\r\n\r\n`);
 			socket.destroy();
-		})
-		.write(
-			'HTTP/1.1 200 Connection Established\r\n' +
-			`X-RV-Host: ${options.remoteUrl}\r\n` +
-			'\r\n'
-		);
+		}
 	});
 
 	rvServer.listen(options.port, function() {
@@ -96,15 +110,30 @@ module.exports.stop = function(callback) {
 	while (tunnels.length) {
 		tunnels.pop().destroy();
 	}
+
+	if (livestyleConnection) {
+		livestyleConnection.destroy();
+	}
 	
 	stubServer.close(function() {
 		rvServer.close(callback);
 	});
 };
 
-module.exports.tunnels = tunnels;
+Object.defineProperties(module.exports, {
+	tunnels: {
+		get() {
+			return tunnels;
+		}
+	},
+	livestyle: {
+		get() {
+			return livestyleConnection;
+		}
+	}
+});
 
-function redirect(socket, url, req, res) {
+function headerPayload(req, url) {
 	var headers = extend(req.headers, {
 		host: parseUrl(url).host
 	});
@@ -115,6 +144,54 @@ function redirect(socket, url, req, res) {
 	});
 	payload.push('\r\n');
 
-	socket.write(payload.join('\r\n'));
+	return payload.join('\r\n');
+}
+
+function redirect(socket, url, req, res) {
+	socket.write(headerPayload(req, url));
 	req.pipe(socket, {end: false}).pipe(res.connection);
+}
+
+function redirectWS(socket, url, req) {
+	socket.write(headerPayload(req, url));
+	req.connection.pipe(socket).pipe(req.connection);
+}
+
+function connectLivestyle(socket, options) {
+	if (livestyleConnection) {
+		// there’s already active LS connection
+		socket.end('HTTP/1.1 409 Already Connected\r\n\r\n');
+		return socket.destroy();
+	}
+
+	livestyleConnection = socket;
+	rvServer.emit('livestyle', socket);
+	socket
+	.once('close', function() {
+		if (livestyleConnection) {
+			livestyleConnection.destroy();
+			livestyleConnection = null;
+		}
+	})
+	.write(
+		'HTTP/1.1 200 Connection Established\r\n' +
+		`X-RV-Host: ${options.livestyleUrl}\r\n` +
+		'\r\n'
+	);
+}
+
+function connectTunnel(socket, options) {
+	tunnels.push(socket);
+	rvServer.emit('tunnel', socket);
+	socket
+	.once('end', function() {
+		var ix = tunnels.indexOf(this);
+		~ix && tunnels.splice(ix, 1);
+		this.destroy();
+	})
+	.write(
+		'HTTP/1.1 200 Connection Established\r\n' +
+		`X-RV-Host: ${options.remoteUrl}\r\n` +
+		'\r\n'
+	);
 }

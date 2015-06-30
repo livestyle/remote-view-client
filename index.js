@@ -14,6 +14,7 @@ if (require.main === module) {
 	var sessionId = process.argv[2] || '';
 	var cluster = new TunnelCluster({
 		url: `http://localhost:9001/${sessionId}`,
-		maxConnections: 10
+		maxConnections: 10,
+		livestyleConnector: true
 	});
 }
