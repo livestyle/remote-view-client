@@ -3,6 +3,7 @@
 var fs = require('fs');
 var path = require('path');
 var http = require('http');
+var WebSocketServer = require('websocket').server;
 var parseUrl = require('url').parse;
 var extend = require('xtend');
 
@@ -71,33 +72,39 @@ module.exports.start = function(options, callback) {
 			return socket.destroy();
 		}
 
-		if (req.headers['x-rv-connection'] === 'livestyle') {
-			// a LiveStyle dedicated connector, keep it separately
-			connectLivestyle(socket, options);
-		} else {
-			connectTunnel(socket, options);
-		}
-	})
-	.on('upgrade', function(req, socket) {
-		if (/^\/__livestyle__\b/.test(req.url)) {
-			// requested connection to LiveStyle tunnel
-			if (livestyleConnection) {
-				redirectWS(livestyleConnection, options.livestyleUrl, req);
-			} else {
-				socket.end(`HTTP/1.1 404 No Connected LiveStyle Client\r\n\r\n`);
-				socket.destroy();
-			}
-			return;
-		}
+		connectTunnel(socket, options);
+	});
 
-		if (tunnels.length) {
-			redirectWS(tunnels[0], options.remoteUrl, req);
+	var ws = new WebSocketServer({
+		httpServer: rvServer,
+		autoAcceptConnections: false
+	})
+	.on('request', function(req) {
+		if (req.httpRequest.headers['x-rv-connection'] === 'livestyle') {
+			// this is a LiveStyle message channel, broadcast all messages from
+			// it to other connected clients
+			livestyleConnection = req.accept(null, options.remoteUrl)
+			.on('message', function(message) {
+				ws.connections.forEach(function(conn) {
+					if (conn !== livestyleConnection) {
+						conn.send(message.utf8Data);
+					}
+				});
+			});
+		} else if (/^\/__livestyle__\b/.test(req.httpRequest.url)) {
+			// a connection to LiveStyle message channel
+			req.accept();
 		} else {
-			socket.end(`HTTP/1.1 404 No Tunnel\r\n\r\n`);
-			socket.destroy();
+			if (tunnels.length) {
+				ws.handleRequestResolved(req);
+				redirectWS(tunnels[0], options.remoteUrl, req.httpRequest);
+			} else {
+				req.reject(404, 'No Tunnel');
+			}
 		}
 	});
 
+	rvServer.ws = ws;
 	rvServer.listen(options.port, function() {
 		stubServer.listen(parseUrl(options.remoteUrl).port, callback);
 	});
@@ -112,10 +119,12 @@ module.exports.stop = function(callback) {
 	}
 
 	if (livestyleConnection) {
-		livestyleConnection.destroy();
+		livestyleConnection.removeAllListeners();
+		livestyleConnection.drop();
 	}
 	
 	stubServer.close(function() {
+		rvServer.ws.shutDown();
 		rvServer.close(callback);
 	});
 };
@@ -126,7 +135,12 @@ Object.defineProperties(module.exports, {
 			return tunnels;
 		}
 	},
-	livestyle: {
+	server: {
+		get() {
+			return rvServer;
+		}
+	},
+	livestyleConnection: {
 		get() {
 			return livestyleConnection;
 		}
