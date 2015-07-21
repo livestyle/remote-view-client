@@ -11,7 +11,7 @@ function cluster(options, callback) {
 	}
 
 	if (typeof options === 'string') {
-		options = {url: options};
+		options = {connectUrl: options};
 	}
 
 	return new TunnelCluster(options, callback);
@@ -35,7 +35,7 @@ describe('Cluster', function() {
 		// receives data, then close all tunnels except one after
 		// `idleTimeout` period of inactivity
 		var options = {
-			url: 'http://localhost:9001/sess-test',
+			connectUrl: 'http://localhost:9001/sess-test',
 			maxConnections: 4, 
 			idleTimeout: 200
 		};
@@ -102,7 +102,7 @@ describe('Cluster', function() {
 
 	describe('Re-connect', function() {
 		var options = {
-			url: 'http://localhost:9001/sess-test',
+			connectUrl: 'http://localhost:9001/sess-test',
 			retryCount: 5,
 			retryDelay: 100
 		};
